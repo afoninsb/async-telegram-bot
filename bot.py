@@ -102,9 +102,9 @@ async def start(data: dict[str, Union[str, int, bool]], chat_id: int) -> None:
         }
         await send_message(message)
         return
-    first_name = data['first_name']
-    last_name = data['last_name']
-    username = data['username']
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    username = data.get('username')
     await save_user({
         'id': chat_id,
         'first_name': first_name,
