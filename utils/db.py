@@ -20,7 +20,8 @@ async def get_voices(chat_id: int) -> collections.InstrumentedList:
     """Получаем информацию об аудиозаписях пользователя."""
     try:
         with Session(autoflush=False, bind=models.engine) as db:
-            user = db.query(models.User).filter(models.User.id == chat_id).first()
+            user = db.query(models.User).filter(
+                models.User.id == chat_id).first()
             return user.voices
     except Exception as e:
         raise DBError('Обшибка при работе с базой данных') from e
@@ -31,7 +32,8 @@ async def save_voice(data: dict[str, Union[str, int]]) -> None:
     chat_id = data.pop('user_id')
     try:
         with Session(autoflush=False, bind=models.engine) as db:
-            user = db.query(models.User).filter(models.User.id == chat_id).first()
+            user = db.query(models.User).filter(
+                models.User.id == chat_id).first()
             voice = models.Voice(**data)
             user.voices.extend([voice])
             db.add(user)
