@@ -3,60 +3,71 @@ from http import HTTPStatus
 from typing import Union
 import aiohttp
 from aiohttp import web
+import psycopg2
 import requests
 import json
 import os
 from aiohttp.web_response import Response
 from aiohttp.web_request import Request
 from requests.models import Response as reqResponse
+from sqlalchemy.orm import Session
+
+import models
+import settings
 
 
-TOKEN = '6148703501:AAHxM1XFR99QznDLb_BIptUOfGEeNFBK3RU'  # Токен телеграм бота
-API_URL = f'https://api.telegram.org/bot{TOKEN}'  # адрес для отправки и получения команд
-API_FILE_URL = f'https://api.telegram.org/file/bot{TOKEN}'  # адрес для получения файлов
-BASE_URL = 'https://1354-95-73-105-75.eu.ngrok.io'  # адрес сайта
-DIR = 'uploads'  # папка для сохранения файлов
-COMMANDS = [  # команды бота
-    {
-        'command': 'start',
-        'description': 'Старт бота'
-    },
-    {
-        'command': 'send',
-        'description': 'Записать и отправить аудиосообщение'
-    },
-    {
-        'command': 'records',
-        'description': 'Вывести список сообщений пользователя'
-    },
-]
+async def save_voice(data: dict[str, Union[str, int]]):
+    with Session(autoflush=False, bind=models.engine) as db:
+        voice = models.Voice(**data)
+        db.add(voice)
+        db.commit()
+
+
+async def save_user(data: dict[str, Union[str, int]]):
+    with Session(autoflush=False, bind=models.engine) as db:
+        user = models.User(**data)
+        db.add(user)
+        db.commit()
+
+
+async def get_user(chat_id: int) -> models.User:
+    with Session(autoflush=False, bind=models.engine) as db:
+        return db.query(models.User).filter(models.User.id == chat_id).first()
+
+
+async def edit_state_user(chat_id: int, state: str) -> None:
+    user = await get_user(chat_id)
+    with Session(autoflush=False, bind=models.engine) as db:
+        user.state = state
+        db.add(user)
+        db.commit()
 
 
 async def get_file(data: dict[str, str]) -> dict[str, str] | None:
     """Получение информации о файле, отправленном юзером в бот."""
-    method = f'{API_URL}/getFile'
+    method = f'{settings.API_URL}/getFile'
     file = requests.post(method, data=data)
     if file.status_code != HTTPStatus.OK:
         return
     return json.loads(file._content)['result']
 
 
-async def save_file(file_data: dict[str, str], chat_id: int) -> bool:
+async def save_file(file_data: dict[str, str], chat_id: int) -> str | None:
     """Сохранения файла, отправленного юзером в бот."""
-    if not os.path.exists(DIR):
-        os.makedirs(DIR)
+    if not os.path.exists(settings.DIR):
+        os.makedirs(settings.DIR)
     path = file_data["file_path"]
-    url = f'{API_FILE_URL}/{path}'
+    url = f'{settings.API_FILE_URL}/{path}'
     file_name = f'{chat_id}-{file_data["file_unique_id"]}.{path[-3:]}'
-    with open(f'{DIR}/{file_name}', "wb") as f:
+    with open(f'{settings.DIR}/{file_name}', "wb") as f:
         file = requests.get(url)
         if file.status_code != HTTPStatus.OK:
-            return False
+            return
         try:
             f.write(file.content)
         except Exception:
-            return False
-    return True
+            return
+    return file_name
 
 
 async def records(chat_id: int) -> None:
@@ -66,8 +77,15 @@ async def records(chat_id: int) -> None:
 
 async def voice(data: dict[str, Union[str, int]], chat_id: int) -> None:
     """Обработка голосового сообщения, отправленного юзером в бот."""
-    # if status_user != send:
-    #     return
+    user = await get_user(chat_id)
+    if user.state != 'send':
+        message = {
+            'chat_id': chat_id,
+            'text': 'Для отправки голосового сообщения отправьте команду /send'
+        }
+        await send_message(message)
+        return
+    await edit_state_user(chat_id, '')
     message = {'chat_id': chat_id}
     duration = data['duration']
     file_id = data['file_id']
@@ -77,17 +95,25 @@ async def voice(data: dict[str, Union[str, int]], chat_id: int) -> None:
         message['text'] = 'Что-то пошло не так. Файл не сохранён'
         await send_message(message)
         return
-    if await save_file(file_data, chat_id):
-        # await save_to_db()
-        message['text'] = 'Ваше сообщение принято'
-    else:
+    file_name = await save_file(file_data, chat_id)
+    if not file_name:
         message['text'] = 'Что-то пошло не так. Повторите ещё раз'
+        await send_message(message)
+        return
+    await save_voice({
+        'user_id': chat_id,
+        'file_id': file_id,
+        'file_size': file_size,
+        'duration': duration,
+        'url': f'{settings.DIR}/{file_name}',
+    })
+    message['text'] = 'Ваше сообщение принято'
     await send_message(message)
 
 
 async def send(chat_id: int) -> None:
     """Обработка команды /start."""
-    # await save_to_db() сохраняет состояние
+    await edit_state_user(chat_id, 'send')
     message = {
         'chat_id': chat_id,
         'text': 'Запишите и отправьте голосовое сообщение'
@@ -97,10 +123,23 @@ async def send(chat_id: int) -> None:
 
 async def start(data: dict[str, Union[str, int, bool]], chat_id: int) -> None:
     """Обработка команды /start."""
+    user = await get_user(chat_id)
+    if user:
+        message = {
+            'chat_id': chat_id,
+            'text': 'Вы уже зарегистрированы'
+        }
+        await send_message(message)
+        return
     first_name = data['first_name']
     last_name = data['last_name']
     username = data['username']
-    # await save_to_db()
+    await save_user({
+        'id': chat_id,
+        'first_name': first_name,
+        'last_name': last_name,
+        'username': username,
+    })
     message = {
         'chat_id': chat_id,
         'text': (f'Приветствую вас, {first_name} {last_name}\n'
@@ -113,7 +152,7 @@ async def ha_ha(chat_id: int) -> None:
     """Ответ на получение неизвестной информации."""
     message = {
         'chat_id': chat_id,
-        'text': ('Ага, и вам приветик... '
+        'text': ('Ага, и вам приветик...\n'
                  'Отправьте /send для отправки голосового сообщения')
     }
     await send_message(message)
@@ -124,7 +163,7 @@ async def send_message(message: dict[str, str]) -> None | Response:
     headers = {'Content-Type': 'application/json'}
     async with aiohttp.ClientSession() as session:
         async with session.post(
-                    f'{API_URL}/sendMessage',
+                    f'{settings.API_URL}/sendMessage',
                     data=json.dumps(message),
                     headers=headers) as resp:
             try:
@@ -139,11 +178,11 @@ async def handler(request: Request) -> Response:
     chat_id = data['message']['from']['id']
     if data['message'].get('text'):
         match data['message']['text']:
-            case "/start":
+            case '/start':
                 await start(data['message']['from'], chat_id)
-            case "/send":
+            case '/send':
                 await send(chat_id)
-            case "/records":
+            case '/records':
                 await records(chat_id)
             case _:
                 await ha_ha(chat_id)
@@ -156,20 +195,26 @@ async def handler(request: Request) -> Response:
 
 def set_webhook() -> reqResponse:
     """Установка веб-хука бота."""
-    method = f'{API_URL}/setWebhook'
-    data = {'url': BASE_URL}
+    method = f'{settings.API_URL}/setWebhook'
+    data = {'url': settings.BASE_URL}
     return requests.post(method, data=data)
 
 
 def set_commands() -> reqResponse:
     """Установка комманд бота."""
-    method = f'{API_URL}/setMyCommands'
-    commands = str(json.dumps(COMMANDS))
+    method = f'{settings.API_URL}/setMyCommands'
+    commands = str(json.dumps(settings.COMMANDS))
     send_text = f'{method}?commands={commands}'
     return requests.post(send_text)
 
 
 if __name__ == '__main__':
+    try:
+        connect = psycopg2.connect(**settings.DB)
+    except psycopg2.OperationalError:
+        print("Не удалось подключиться к базе данных")
+        raise
+    connect.autocommit = True
     set_webhook = set_webhook()
     set_commands = set_commands()
     if (set_webhook.status_code == HTTPStatus.OK
