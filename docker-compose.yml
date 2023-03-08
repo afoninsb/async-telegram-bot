@@ -1,0 +1,35 @@
+version: '3.3'
+
+services:
+
+  db:
+    image: postgres:13.0-alpine
+    volumes:
+      - postgres_value:/var/lib/postgresql/data/
+    env_file:
+      - ./.env
+    restart: unless-stopped
+
+  ngrok:
+    image: shkoliar/ngrok:latest
+    ports:
+      - 4551:4551
+    depends_on:
+      - db
+    links:
+      - web
+    environment:
+      - DOMAIN=web
+      - PORT=8080
+
+  web:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - media_value:/uploads/
+    env_file:
+      - ./.env
+
+volumes:
+  media_value:
+  postgres_value:
