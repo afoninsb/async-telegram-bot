@@ -10,9 +10,9 @@ from aiohttp.web_response import Response
 
 import models
 import settings
-from inlines import voices_kbrd
 from utils import (edit_state_user, get_file, get_user, get_voice, get_voices,
-                   save_file, save_user, save_voice, set_commands, set_webhook)
+                   save_file, save_user, save_voice, set_commands, set_webhook,
+                   voices_kbrd)
 
 
 async def voice_info(data: str, chat_id: int) -> models.Voice:
