@@ -1,8 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 from settings import DB
-
 
 sqlite_database = (f'postgresql://{DB["user"]}:'
                    f'{DB["password"]}@{DB["host"]}/{DB["dbname"]}')

@@ -1,18 +1,22 @@
 import os
-from dotenv import load_dotenv, find_dotenv
+
+from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv())
 
-DEBUG = os.getenv("DEBUG", 'False').lower() in ('true', '1', 't')
+# Телеграм бот токен
+TOKEN = str(os.getenv('TOKEN'))
 
-TOKEN = str(os.getenv('TOKEN'))  # Телеграм бот токен
+# адрес сайта
+BASE_URL = str(os.getenv('BASE_URL'))
 
-BASE_URL = str(os.getenv('BASE_URL'))  # адрес сайта
+# адрес для отправки и получения команд
+API_URL = f'https://api.telegram.org/bot{TOKEN}'
 
-API_URL = f'https://api.telegram.org/bot{TOKEN}'  # адрес для отправки и получения команд
+# адрес для получения файлов
+API_FILE_URL = f'https://api.telegram.org/file/bot{TOKEN}'
 
-API_FILE_URL = f'https://api.telegram.org/file/bot{TOKEN}'  # адрес для получения файлов
-
+# Настройки базы данных
 DB = {
     'dbname': str(os.getenv('POSTGRES_DB')),
     'host': str(os.getenv('DB_HOST')),
@@ -21,9 +25,11 @@ DB = {
     'port': int(os.getenv('DB_PORT'))
 }
 
-DIR = 'uploads'  # папка для сохранения файлов
+# папка для сохранения файлов
+DIR = 'uploads'
 
-COMMANDS = [  # команды бота
+# команды бота
+COMMANDS = [
     {
         'command': 'start',
         'description': 'Старт бота'

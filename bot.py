@@ -1,94 +1,18 @@
+import json
 from http import HTTPStatus
 from typing import Union
+
 import aiohttp
-from aiohttp import web
 import psycopg2
-import requests
-import json
-import os
-from aiohttp.web_response import Response
+from aiohttp import web
 from aiohttp.web_request import Request
-from requests.models import Response as reqResponse
-from sqlalchemy.orm import collections, Session
+from aiohttp.web_response import Response
 
 import models
 import settings
-
 from inlines import voices_kbrd
-
-
-async def get_voice(voice_id: int) -> models.Voice:
-    """Получаем информацию об аудиозаписи."""
-    with Session(autoflush=False, bind=models.engine) as db:
-        return db.query(models.Voice).filter(
-            models.Voice.id == voice_id).first()
-
-
-async def get_voices(chat_id: int) -> collections.InstrumentedList:
-    """Получаем информацию об аудиозаписях пользователя."""
-    with Session(autoflush=False, bind=models.engine) as db:
-        user = db.query(models.User).filter(models.User.id == chat_id).first()
-        return user.voices
-
-async def save_voice(data: dict[str, Union[str, int]]) -> None:
-    """Сохраняем информацию о файле в базу данных."""
-    chat_id = data.pop('user_id')
-    with Session(autoflush=False, bind=models.engine) as db:
-        user = db.query(models.User).filter(models.User.id == chat_id).first()
-        voice = models.Voice(**data)
-        user.voices.extend([voice])
-        db.add(user)
-        db.commit()
-
-
-async def save_user(data: dict[str, Union[str, int]]) -> None:
-    """Сохраняем информацию о пользователе в базу данных."""
-    with Session(autoflush=False, bind=models.engine) as db:
-        user = models.User(**data)
-        db.add(user)
-        db.commit()
-
-
-async def get_user(chat_id: int) -> models.User:
-    """Получаем информацию о пользователе из базы данных."""
-    with Session(autoflush=False, bind=models.engine) as db:
-        return db.query(models.User).filter(models.User.id == chat_id).first()
-
-
-async def edit_state_user(chat_id: int, state: str) -> None:
-    """Изменяем состояние пользователя в базе данных."""
-    user = await get_user(chat_id)
-    with Session(autoflush=False, bind=models.engine) as db:
-        user.state = state
-        db.add(user)
-        db.commit()
-
-
-async def get_file(data: dict[str, str]) -> dict[str, str] | None:
-    """Получение информации о файле, отправленном юзером в бот."""
-    method = f'{settings.API_URL}/getFile'
-    file = requests.post(method, data=data)
-    if file.status_code != HTTPStatus.OK:
-        return
-    return json.loads(file._content)['result']
-
-
-async def save_file(file_data: dict[str, str], chat_id: int) -> str | None:
-    """Сохраняем файл, отправленный юзером в бот."""
-    if not os.path.exists(settings.DIR):
-        os.makedirs(settings.DIR)
-    path = file_data["file_path"]
-    url = f'{settings.API_FILE_URL}/{path}'
-    file_name = f'{chat_id}-{file_data["file_unique_id"]}.{path[-3:]}'
-    with open(f'{settings.DIR}/{file_name}', "wb") as f:
-        file = requests.get(url)
-        if file.status_code != HTTPStatus.OK:
-            return
-        try:
-            f.write(file.content)
-        except Exception:
-            return
-    return file_name
+from utils import (edit_state_user, get_file, get_user, get_voice, get_voices,
+                   save_file, save_user, save_voice, set_commands, set_webhook)
 
 
 async def voice_info(data: str, chat_id: int) -> models.Voice:
@@ -205,9 +129,9 @@ async def send_message(message: dict[str, str]) -> None | Response:
     headers = {'Content-Type': 'application/json'}
     async with aiohttp.ClientSession() as session:
         async with session.post(
-                    f'{settings.API_URL}/sendMessage',
-                    data=json.dumps(message),
-                    headers=headers) as resp:
+                f'{settings.API_URL}/sendMessage',
+                data=json.dumps(message),
+                headers=headers) as resp:
             try:
                 assert resp.status_code == HTTPStatus.OK
             except Exception:
@@ -246,21 +170,6 @@ async def handler(request: Request) -> Response:
     else:
         await ha_ha(chat_id)
     return Response(status=HTTPStatus.OK)
-
-
-def set_webhook() -> reqResponse:
-    """Установка веб-хука бота."""
-    method = f'{settings.API_URL}/setWebhook'
-    data = {'url': settings.BASE_URL}
-    return requests.post(method, data=data)
-
-
-def set_commands() -> reqResponse:
-    """Установка комманд бота."""
-    method = f'{settings.API_URL}/setMyCommands'
-    commands = str(json.dumps(settings.COMMANDS))
-    send_text = f'{method}?commands={commands}'
-    return requests.post(send_text)
 
 
 if __name__ == '__main__':
