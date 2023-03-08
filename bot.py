@@ -79,6 +79,7 @@ async def voice(data: dict[str, Union[str, int]], chat_id: int) -> None:
     })
     message['text'] = 'Ваше сообщение принято'
     await send_message(message)
+    await print_log('info', 'Получен и сохранен новый файл')
 
 
 async def send(chat_id: int) -> None:
@@ -116,6 +117,7 @@ async def start(data: dict[str, Union[str, int, bool]], chat_id: int) -> None:
                  'Для отправки голосового сообщения отправьте команду /send')
     }
     await send_message(message)
+    await print_log('info', 'Зарегистрировался новый пользователь')
 
 
 async def ha_ha(chat_id: int) -> None:
@@ -137,7 +139,7 @@ async def send_message(message: dict[str, str]) -> None | Response:
                 data=json.dumps(message),
                 headers=headers) as resp:
             try:
-                assert resp.status_code == HTTPStatus.OK
+                assert resp.status == HTTPStatus.OK
             except Exception as e:
                 raise MessageNotSent('Сообщение не отправлено') from e
 
