@@ -1,4 +1,3 @@
-import asyncio
 from http import HTTPStatus
 from typing import Union
 import aiohttp
@@ -10,20 +9,40 @@ import os
 from aiohttp.web_response import Response
 from aiohttp.web_request import Request
 from requests.models import Response as reqResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import collections, Session
 
 import models
 import settings
 
+from inlines import voices_kbrd
 
-async def save_voice(data: dict[str, Union[str, int]]):
+
+async def get_voice(voice_id: int) -> models.Voice:
+    """Получаем информацию об аудиозаписи."""
     with Session(autoflush=False, bind=models.engine) as db:
+        return db.query(models.Voice).filter(
+            models.Voice.id == voice_id).first()
+
+
+async def get_voices(chat_id: int) -> collections.InstrumentedList:
+    """Получаем информацию об аудиозаписях пользователя."""
+    with Session(autoflush=False, bind=models.engine) as db:
+        user = db.query(models.User).filter(models.User.id == chat_id).first()
+        return user.voices
+
+async def save_voice(data: dict[str, Union[str, int]]) -> None:
+    """Сохраняем информацию о файле в базу данных."""
+    chat_id = data.pop('user_id')
+    with Session(autoflush=False, bind=models.engine) as db:
+        user = db.query(models.User).filter(models.User.id == chat_id).first()
         voice = models.Voice(**data)
-        db.add(voice)
+        user.voices.extend([voice])
+        db.add(user)
         db.commit()
 
 
-async def save_user(data: dict[str, Union[str, int]]):
+async def save_user(data: dict[str, Union[str, int]]) -> None:
+    """Сохраняем информацию о пользователе в базу данных."""
     with Session(autoflush=False, bind=models.engine) as db:
         user = models.User(**data)
         db.add(user)
@@ -31,11 +50,13 @@ async def save_user(data: dict[str, Union[str, int]]):
 
 
 async def get_user(chat_id: int) -> models.User:
+    """Получаем информацию о пользователе из базы данных."""
     with Session(autoflush=False, bind=models.engine) as db:
         return db.query(models.User).filter(models.User.id == chat_id).first()
 
 
 async def edit_state_user(chat_id: int, state: str) -> None:
+    """Изменяем состояние пользователя в базе данных."""
     user = await get_user(chat_id)
     with Session(autoflush=False, bind=models.engine) as db:
         user.state = state
@@ -53,7 +74,7 @@ async def get_file(data: dict[str, str]) -> dict[str, str] | None:
 
 
 async def save_file(file_data: dict[str, str], chat_id: int) -> str | None:
-    """Сохранения файла, отправленного юзером в бот."""
+    """Сохраняем файл, отправленный юзером в бот."""
     if not os.path.exists(settings.DIR):
         os.makedirs(settings.DIR)
     path = file_data["file_path"]
@@ -70,9 +91,30 @@ async def save_file(file_data: dict[str, str], chat_id: int) -> str | None:
     return file_name
 
 
+async def voice_info(data: str, chat_id: int) -> models.Voice:
+    """Отправляем информацию об аудиозаписи."""
+    voice_id = int(data.split(':')[1])
+    voice = await get_voice(voice_id)
+    text = (f'Информация о файле:\n'
+            f'file_size: {voice.file_size} байт\n'
+            f'duration: {voice.duration} сек')
+    message = {
+        'chat_id': chat_id,
+        'text': text,
+    }
+    await send_message(message)
+
+
 async def records(chat_id: int) -> None:
     """Обработка команды /records."""
-    pass
+    voices = await get_voices(chat_id)
+    keyboard = await voices_kbrd(voices)
+    message = {
+        'chat_id': chat_id,
+        'text': 'Ваши записи:',
+        'reply_markup': keyboard,
+    }
+    await send_message(message)
 
 
 async def voice(data: dict[str, Union[str, int]], chat_id: int) -> None:
@@ -112,7 +154,7 @@ async def voice(data: dict[str, Union[str, int]], chat_id: int) -> None:
 
 
 async def send(chat_id: int) -> None:
-    """Обработка команды /start."""
+    """Обработка команды /send."""
     await edit_state_user(chat_id, 'send')
     message = {
         'chat_id': chat_id,
@@ -172,12 +214,25 @@ async def send_message(message: dict[str, str]) -> None | Response:
                 return Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
+async def get_message(
+    data: dict[str, Union[str, int, bool]]
+) -> dict[str, Union[str, int, bool]]:
+    """Поолучаем объект message с веб-хука."""
+    if data.get('message'):
+        return data['message']
+    if data.get('callback_query'):
+        return data['callback_query']['message']
+
+
 async def handler(request: Request) -> Response:
     """Обработчик полученной от бота информации."""
     data = await request.json()
-    chat_id = data['message']['from']['id']
-    if data['message'].get('text'):
-        match data['message']['text']:
+    message = await get_message(data)
+    chat_id = message['chat']['id']
+    if data.get('callback_query'):
+        await voice_info(data['callback_query']['data'], chat_id)
+    elif data['message'].get('text'):
+        match message['text']:
             case '/start':
                 await start(data['message']['from'], chat_id)
             case '/send':
@@ -186,7 +241,7 @@ async def handler(request: Request) -> Response:
                 await records(chat_id)
             case _:
                 await ha_ha(chat_id)
-    elif data['message'].get('voice'):
+    elif message.get('voice'):
         await voice(data['message']['voice'], chat_id)
     else:
         await ha_ha(chat_id)
@@ -214,7 +269,6 @@ if __name__ == '__main__':
     except psycopg2.OperationalError:
         print("Не удалось подключиться к базе данных")
         raise
-    connect.autocommit = True
     set_webhook = set_webhook()
     set_commands = set_commands()
     if (set_webhook.status_code == HTTPStatus.OK
