@@ -3,6 +3,7 @@ import os
 from http import HTTPStatus
 
 import requests
+from exceptions import FileNotGet, FileNotSave
 
 import settings
 
@@ -26,9 +27,9 @@ async def save_file(file_data: dict[str, str], chat_id: int) -> str | None:
     with open(f'{settings.DIR}/{file_name}', "wb") as f:
         file = requests.get(url)
         if file.status_code != HTTPStatus.OK:
-            return
+            raise FileNotGet('Файл не скачан с сервера Телеграм')
         try:
             f.write(file.content)
-        except Exception:
-            return
+        except Exception as e:
+            raise FileNotSave('Файл не сохранен на диск') from e
     return file_name

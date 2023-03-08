@@ -3,7 +3,8 @@ import json
 import requests
 from requests.models import Response as reqResponse
 
-import settings
+from settings import Settings
+settings = Settings()
 
 
 def set_webhook() -> reqResponse:

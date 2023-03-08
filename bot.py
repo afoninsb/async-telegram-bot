@@ -1,5 +1,6 @@
 import json
 from http import HTTPStatus
+import logging
 from typing import Union
 
 import aiohttp
@@ -7,12 +8,15 @@ import psycopg2
 from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
+from exceptions import DBError, FileNotGet, FileNotSave, MessageNotSent, NoData
 
 import models
-import settings
 from utils import (edit_state_user, get_file, get_user, get_voice, get_voices,
                    save_file, save_user, save_voice, set_commands, set_webhook,
-                   voices_kbrd)
+                   voices_kbrd, print_log)
+
+from settings import Settings
+settings = Settings()
 
 
 async def voice_info(data: str, chat_id: int) -> models.Voice:
@@ -134,56 +138,71 @@ async def send_message(message: dict[str, str]) -> None | Response:
                 headers=headers) as resp:
             try:
                 assert resp.status_code == HTTPStatus.OK
-            except Exception:
-                return Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            except Exception as e:
+                raise MessageNotSent('Сообщение не отправлено') from e
 
 
 async def get_message(
     data: dict[str, Union[str, int, bool]]
-) -> dict[str, Union[str, int, bool]]:
+) -> dict[str, Union[str, int, bool]] | None:
     """Поолучаем объект message с веб-хука."""
     if data.get('message'):
         return data['message']
     if data.get('callback_query'):
         return data['callback_query']['message']
+    raise NoData('Получен пустой словарь')
 
 
 async def handler(request: Request) -> Response:
     """Обработчик полученной от бота информации."""
     data = await request.json()
-    message = await get_message(data)
-    chat_id = message['chat']['id']
-    if data.get('callback_query'):
-        await voice_info(data['callback_query']['data'], chat_id)
-    elif data['message'].get('text'):
-        match message['text']:
-            case '/start':
-                await start(data['message']['from'], chat_id)
-            case '/send':
-                await send(chat_id)
-            case '/records':
-                await records(chat_id)
-            case _:
-                await ha_ha(chat_id)
-    elif message.get('voice'):
-        await voice(data['message']['voice'], chat_id)
+    try:
+        message = await get_message(data)
+        chat_id = message['chat']['id']
+        if data.get('callback_query'):
+            await voice_info(data['callback_query']['data'], chat_id)
+        elif data['message'].get('text'):
+            match message['text']:
+                case '/start':
+                    await start(data['message']['from'], chat_id)
+                case '/send':
+                    await send(chat_id)
+                case '/records':
+                    await records(chat_id)
+                case _:
+                    await ha_ha(chat_id)
+        elif message.get('voice'):
+            await voice(data['message']['voice'], chat_id)
+        else:
+            await ha_ha(chat_id)
+    except (NoData, MessageNotSent, DBError, FileNotGet, FileNotSave) as exc:
+        await print_log('error', exc)
     else:
-        await ha_ha(chat_id)
-    return Response(status=HTTPStatus.OK)
+        return Response(status=HTTPStatus.OK)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        filename='log.log',
+        filemode='w',
+        format='[%(asctime)s] %(levelname).1s %(message)s',
+        datefmt='%Y.%m.%d %H:%M:%S',
+    )
+
     try:
         connect = psycopg2.connect(**settings.DB)
     except psycopg2.OperationalError:
         print("Не удалось подключиться к базе данных")
+        logging.error('Вебхук не установлен')
         raise
-    set_webhook = set_webhook()
-    set_commands = set_commands()
-    if (set_webhook.status_code == HTTPStatus.OK
-            and set_commands.status_code == HTTPStatus.OK):
+    webhook = set_webhook()
+    commands = set_commands()
+    if (webhook.status_code == HTTPStatus.OK
+            and commands.status_code == HTTPStatus.OK):
         app = web.Application()
         app.add_routes([web.get('/', handler), web.post('/', handler)])
         web.run_app(app)
     else:
         print('Вебхук не установлен')
+        logging.error('Вебхук не установлен')

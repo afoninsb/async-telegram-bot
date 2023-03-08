@@ -1,10 +1,12 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, relationship
 
-from settings import DB
+from settings import Settings
+settings = Settings()
 
-sqlite_database = (f'postgresql://{DB["user"]}:'
-                   f'{DB["password"]}@{DB["host"]}/{DB["dbname"]}')
+sqlite_database = (f'postgresql://{settings.DB["user"]}:'
+                   f'{settings.DB["password"]}@{settings.DB["host"]}/'
+                   f'{settings.DB["dbname"]}')
 engine = create_engine(sqlite_database)
 
 

@@ -1,45 +1,50 @@
 import os
+from typing import Union
+from pydantic import BaseSettings
 
 from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv())
 
-# Телеграм бот токен
-TOKEN = str(os.getenv('TOKEN'))
 
-# адрес сайта
-BASE_URL = str(os.getenv('BASE_URL'))
+class Settings(BaseSettings):
 
-# адрес для отправки и получения команд
-API_URL = f'https://api.telegram.org/bot{TOKEN}'
+    # Телеграм бот токен
+    TOKEN: str = os.getenv('TOKEN')
 
-# адрес для получения файлов
-API_FILE_URL = f'https://api.telegram.org/file/bot{TOKEN}'
+    # адрес сайта
+    BASE_URL: str = os.getenv('BASE_URL')
 
-# Настройки базы данных
-DB = {
-    'dbname': str(os.getenv('POSTGRES_DB')),
-    'host': str(os.getenv('DB_HOST')),
-    'user': str(os.getenv('POSTGRES_USER')),
-    'password': str(os.getenv('POSTGRES_PASSWORD')),
-    'port': int(os.getenv('DB_PORT'))
-}
+    # адрес для отправки и получения команд
+    API_URL: str = f'https://api.telegram.org/bot{TOKEN}'
 
-# папка для сохранения файлов
-DIR = 'uploads'
+    # адрес для получения файлов
+    API_FILE_URL: str = f'https://api.telegram.org/file/bot{TOKEN}'
 
-# команды бота
-COMMANDS = [
-    {
-        'command': 'start',
-        'description': 'Старт бота'
-    },
-    {
-        'command': 'send',
-        'description': 'Записать и отправить аудиосообщение'
-    },
-    {
-        'command': 'records',
-        'description': 'Вывести список сообщений пользователя'
-    },
-]
+    # Настройки базы данных
+    DB: dict[str, Union[str, int]] = {
+        'dbname': os.getenv('POSTGRES_DB'),
+        'host': os.getenv('DB_HOST'),
+        'user': os.getenv('POSTGRES_USER'),
+        'password': os.getenv('POSTGRES_PASSWORD'),
+        'port': os.getenv('DB_PORT')
+    }
+
+    # папка для сохранения файлов
+    DIR: str = 'uploads'
+
+    # команды бота
+    COMMANDS: list[dict[str, str]] = [
+        {
+            'command': 'start',
+            'description': 'Старт бота'
+        },
+        {
+            'command': 'send',
+            'description': 'Записать и отправить аудиосообщение'
+        },
+        {
+            'command': 'records',
+            'description': 'Вывести список сообщений пользователя'
+        },
+    ]

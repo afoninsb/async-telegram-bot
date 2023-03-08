@@ -3,6 +3,7 @@ from utils.db import (edit_state_user, get_user, get_voice, get_voices,
 from utils.file import get_file, save_file
 from utils.webhook import set_commands, set_webhook
 from utils.inlines import voices_kbrd
+from utils.log import print_log
 
 
 __all__ = (
@@ -16,5 +17,6 @@ __all__ = (
     save_file,
     set_commands,
     set_webhook,
-    voices_kbrd
+    voices_kbrd,
+    print_log
 )
