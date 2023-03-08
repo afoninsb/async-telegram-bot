@@ -3,9 +3,9 @@ import os
 from http import HTTPStatus
 
 import requests
-from exceptions import FileNotGet, FileNotSave
 
 import settings
+from exceptions import FileNotGet, FileNotSave
 
 
 async def get_file(data: dict[str, str]) -> dict[str, str] | None:

@@ -4,6 +4,7 @@ import requests
 from requests.models import Response as reqResponse
 
 from settings import Settings
+
 settings = Settings()
 
 

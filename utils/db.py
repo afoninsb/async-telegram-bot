@@ -1,9 +1,9 @@
 from typing import Union
 
 from sqlalchemy.orm import Session, collections
-from exceptions import DBError
 
 import models
+from exceptions import DBError
 
 
 async def get_voice(voice_id: int) -> models.Voice:

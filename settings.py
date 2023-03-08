@@ -1,8 +1,8 @@
 import os
 from typing import Union
-from pydantic import BaseSettings
 
 from dotenv import find_dotenv, load_dotenv
+from pydantic import BaseSettings
 
 load_dotenv(find_dotenv())
 
