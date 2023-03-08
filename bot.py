@@ -196,7 +196,7 @@ if __name__ == '__main__':
         connect = psycopg2.connect(**settings.DB)
     except psycopg2.OperationalError:
         print("Не удалось подключиться к базе данных")
-        logging.error('Вебхук не установлен')
+        logging.error('Не удалось подключиться к базе данных')
         raise
     webhook = set_webhook()
     commands = set_commands()
