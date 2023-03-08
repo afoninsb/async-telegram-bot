@@ -37,4 +37,4 @@ https://api.telegram.org/bot<_TOKEN_>/setWebhook?url=<_URL-NGROK_>,
 
 где <_TOKEN_> - токен бота, выданный вам BotFather, <_URL-NGROK_> - https-url, скопированныйв п. 3
 
-5) Можете проверять :)
+5) Можете проверять работу бота :)
