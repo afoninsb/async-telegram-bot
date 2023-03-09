@@ -4,7 +4,7 @@
 
 ## Технологический стек
 
-Python 3.10, aiohttp 3.8, asyncio 3.4, PostgreSQL 15.2, SQLAlchemy 2.0
+Python 3.10, aiohttp 3.8, asyncio 3.4, aiofiles 23.1, PostgreSQL 15.2, SQLAlchemy 2.0
 
 ## Создайте Telegram-бота
 
