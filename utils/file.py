@@ -37,7 +37,8 @@ async def save_file(file_data: dict[str, str], chat_id: int) -> str | None:
             if resp.status != HTTPStatus.OK:
                 raise FileNotGet('Файл не скачан с сервера Телеграм')
             try:
-                f = await aiofiles.open(f'{settings.DIR}/{file_name}', mode='wb')
+                f = await aiofiles.open(
+                    f'{settings.DIR}/{file_name}', mode='wb')
                 await f.write(await resp.read())
                 await f.close()
             except Exception as e:
