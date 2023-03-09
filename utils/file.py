@@ -1,10 +1,7 @@
 import aiohttp
 import aiofiles
-import json
 import os
 from http import HTTPStatus
-
-import requests
 
 from exceptions import FileNotGet, FileNotSave
 from settings import Settings
