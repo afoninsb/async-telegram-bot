@@ -179,8 +179,7 @@ async def handler(request: Request) -> Response:
             await ha_ha(chat_id)
     except (NoData, MessageNotSent, DBError, FileNotGet, FileNotSave) as exc:
         await print_log('error', exc)
-    else:
-        return Response(status=HTTPStatus.OK)
+    return Response(status=HTTPStatus.OK)
 
 
 if __name__ == '__main__':

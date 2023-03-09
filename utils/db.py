@@ -14,7 +14,8 @@ async def get_voice(voice_id: int) -> models.Voice:
             return db.query(models.Voice).filter(
                 models.Voice.id == voice_id).first()
     except Exception as e:
-        raise DBError('Ошибка при работе с базой данных') from e
+        raise DBError(
+            'ОШИБКА при получении информации из БД о файле {voice_id}') from e
 
 
 async def get_voices(chat_id: int) -> collections.InstrumentedList:
@@ -25,7 +26,8 @@ async def get_voices(chat_id: int) -> collections.InstrumentedList:
                 models.User.id == chat_id).first()
             return user.voices
     except Exception as e:
-        raise DBError('Ошибка при работе с базой данных') from e
+        raise DBError(
+            'ОШИБКА при получении списка файлов из базы данных') from e
 
 
 async def save_voice(data: dict[str, Union[str, int]]) -> None:
@@ -44,7 +46,8 @@ async def save_voice(data: dict[str, Union[str, int]]) -> None:
                 f'В БД создана запись аудиозаписи {voice.id}'
             )
     except Exception as e:
-        raise DBError('Ошибка при работе с базой данных') from e
+        raise DBError(
+            'ОШИБКА при внесении информации о файле в базу данных') from e
 
 
 async def save_user(data: dict[str, Union[str, int]]) -> None:
@@ -59,7 +62,9 @@ async def save_user(data: dict[str, Union[str, int]]) -> None:
                 f'В БД создана запись пользователя {user.id}'
             )
     except Exception as e:
-        raise DBError('Ошибка при работе с базой данных') from e
+        raise DBError(
+            'ОШИБКА при внесении информации о пользователе в базу данных'
+        ) from e
 
 
 async def get_user(chat_id: int) -> models.User:
@@ -69,7 +74,9 @@ async def get_user(chat_id: int) -> models.User:
             return db.query(models.User).filter(
                 models.User.id == chat_id).first()
     except Exception as e:
-        raise DBError('Ошибка при работе с базой данных') from e
+        raise DBError(
+            'ОШИБКА при получении информации о пользователе из базы данных'
+        ) from e
 
 
 async def edit_state_user(chat_id: int, state: str) -> None:
@@ -81,4 +88,6 @@ async def edit_state_user(chat_id: int, state: str) -> None:
             db.add(user)
             db.commit()
     except Exception as e:
-        raise DBError('Ошибка при работе с базой данных') from e
+        raise DBError(
+            'ОШИБКА при изменении состояния пользователя в базе данных'
+        )from e
