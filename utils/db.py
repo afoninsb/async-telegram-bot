@@ -7,13 +7,16 @@ from utils.log import print_log
 
 
 async def connection():
-    return await asyncpg.connect(
-        host=settings.DB['host'],
-        port=settings.DB['port'],
-        user=settings.DB['user'],
-        database=settings.DB['dbname'],
-        password=settings.DB['password']
-    )
+    try:
+        return await asyncpg.connect(
+            host=settings.DB['host'],
+            port=settings.DB['port'],
+            user=settings.DB['user'],
+            database=settings.DB['dbname'],
+            password=settings.DB['password']
+        )
+    except asyncpg.exceptions as e:
+        raise DBError(f'ОШИБКА подключения к базе данных: {e}') from e
 
 
 async def get_voice(voice_id: int) -> asyncpg.Record:
