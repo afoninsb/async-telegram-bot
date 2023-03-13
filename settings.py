@@ -48,3 +48,6 @@ class Settings(BaseSettings):
             'description': 'Вывести список сообщений пользователя'
         },
     ]
+
+
+settings = Settings()

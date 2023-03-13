@@ -11,12 +11,10 @@ from aiohttp.web_response import Response
 
 import models
 from exceptions import DBError, FileNotGet, FileNotSave, MessageNotSent, NoData
-from settings import Settings
+from settings import settings
 from utils import (edit_state_user, get_file, get_user, get_voice, get_voices,
                    print_log, save_file, save_user, save_voice, set_commands,
                    set_webhook, voices_kbrd)
-
-settings = Settings()
 
 
 async def voice_info(data: str, chat_id: int) -> models.Voice:
@@ -24,8 +22,8 @@ async def voice_info(data: str, chat_id: int) -> models.Voice:
     voice_id = int(data.split(':')[1])
     voice = await get_voice(voice_id)
     text = (f'Информация о файле:\n'
-            f'file_size: {voice.file_size} байт\n'
-            f'duration: {voice.duration} сек')
+            f'file_size: {voice["file_size"]} байт\n'
+            f'duration: {voice["duration"]} сек')
     message = {
         'chat_id': chat_id,
         'text': text,
@@ -48,7 +46,7 @@ async def records(chat_id: int) -> None:
 async def voice(data: dict[str, Union[str, int]], chat_id: int) -> None:
     """Обработка голосового сообщения, отправленного юзером в бот."""
     user = await get_user(chat_id)
-    if user.state != 'send':
+    if user['state'] != 'send':
         message = {
             'chat_id': chat_id,
             'text': 'Для отправки голосового сообщения отправьте команду /send'

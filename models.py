@@ -1,9 +1,7 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, relationship
 
-from settings import Settings
-
-settings = Settings()
+from settings import settings
 
 sqlite_database = (f'postgresql://{settings.DB["user"]}:'
                    f'{settings.DB["password"]}@{settings.DB["host"]}/'

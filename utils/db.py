@@ -1,93 +1,106 @@
+import asyncpg
 from typing import Union
 
-from sqlalchemy.orm import Session, collections
-
-import models
 from exceptions import DBError
+from settings import settings
 from utils.log import print_log
 
 
-async def get_voice(voice_id: int) -> models.Voice:
+async def connection():
+    return await asyncpg.connect(
+        host=settings.DB['host'],
+        port=settings.DB['port'],
+        user=settings.DB['user'],
+        database=settings.DB['dbname'],
+        password=settings.DB['password']
+    )
+
+
+async def get_voice(voice_id: int) -> asyncpg.Record:
     """Получаем информацию об аудиозаписи."""
+    conn = await connection()
+    sql = f"SELECT * FROM voices WHERE id = {voice_id}"
     try:
-        with Session(autoflush=False, bind=models.engine) as db:
-            return db.query(models.Voice).filter(
-                models.Voice.id == voice_id).first()
+        return await conn.fetchrow(sql)
     except Exception as e:
         raise DBError(
             'ОШИБКА при получении информации из БД о файле {voice_id}') from e
+    finally:
+        await conn.close()
 
 
-async def get_voices(chat_id: int) -> collections.InstrumentedList:
+async def get_voices(chat_id: int) -> list[Union[str, int]]:
     """Получаем информацию об аудиозаписях пользователя."""
+    conn = await connection()
+    sql = f"SELECT * FROM voices WHERE user_id = {chat_id}"
     try:
-        with Session(autoflush=False, bind=models.engine) as db:
-            user = db.query(models.User).filter(
-                models.User.id == chat_id).first()
-            return user.voices
+        return await conn.fetch(sql)
     except Exception as e:
         raise DBError(
             'ОШИБКА при получении списка файлов из базы данных') from e
+    finally:
+        await conn.close()
 
 
 async def save_voice(data: dict[str, Union[str, int]]) -> None:
     """Сохраняем информацию о файле в базу данных."""
-    chat_id = data.pop('user_id')
+    conn = await connection()
+    sql = ("INSERT INTO voices (user_id, file_id, file_size, duration, url) "
+           f"VALUES ({data['user_id']}, '{data['file_id']}', "
+           f"{data['file_size']}, {data['duration']}, '{data['url']}')")
     try:
-        with Session(autoflush=False, bind=models.engine) as db:
-            user = db.query(models.User).filter(
-                models.User.id == chat_id).first()
-            voice = models.Voice(**data)
-            user.voices.extend([voice])
-            db.add(user)
-            db.commit()
-            await print_log(
-                'info',
-                f'В БД создана запись аудиозаписи {voice.id}'
-            )
+        await conn.execute(sql)
+        await print_log('info', 'В БД создана запись аудиозаписи')
     except Exception as e:
         raise DBError(
             'ОШИБКА при внесении информации о файле в базу данных') from e
+    finally:
+        await conn.close()
 
 
 async def save_user(data: dict[str, Union[str, int]]) -> None:
     """Сохраняем информацию о пользователе в базу данных."""
+    conn = await connection()
+    sql = ("INSERT INTO users (id, first_name, last_name, username) "
+           f"VALUES ({data['id']}, '{data['first_name']}', "
+           f"'{data['last_name']}', '{data['username']}')")
     try:
-        with Session(autoflush=False, bind=models.engine) as db:
-            user = models.User(**data)
-            db.add(user)
-            db.commit()
-            await print_log(
-                'info',
-                f'В БД создана запись пользователя {user.id}'
-            )
+        await conn.execute(sql)
+        await print_log(
+            'info',
+            f"В БД создана запись пользователя {data['id']}"
+        )
     except Exception as e:
         raise DBError(
             'ОШИБКА при внесении информации о пользователе в базу данных'
         ) from e
+    finally:
+        await conn.close()
 
 
-async def get_user(chat_id: int) -> models.User:
+async def get_user(chat_id: int) -> asyncpg.Record:
     """Получаем информацию о пользователе из базы данных."""
+    conn = await connection()
+    sql = f"SELECT * FROM users WHERE id = {chat_id}"
     try:
-        with Session(autoflush=False, bind=models.engine) as db:
-            return db.query(models.User).filter(
-                models.User.id == chat_id).first()
+        return await conn.fetchrow(sql)
     except Exception as e:
         raise DBError(
             'ОШИБКА при получении информации о пользователе из базы данных'
         ) from e
+    finally:
+        await conn.close()
 
 
 async def edit_state_user(chat_id: int, state: str) -> None:
     """Изменяем состояние пользователя в базе данных."""
-    user = await get_user(chat_id)
+    conn = await connection()
+    sql = f"UPDATE users SET state = '{state}' WHERE id = {chat_id}"
     try:
-        with Session(autoflush=False, bind=models.engine) as db:
-            user.state = state
-            db.add(user)
-            db.commit()
+        await conn.execute(sql)
     except Exception as e:
         raise DBError(
             'ОШИБКА при изменении состояния пользователя в базе данных'
         )from e
+    finally:
+        await conn.close()
